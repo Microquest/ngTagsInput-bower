@@ -1,0 +1,19 @@
+{
+  "name": "ng-tags-input",
+  "version": "3.1.2",
+  "description": "Tags input directive for AngularJS with a modified search warning.",
+  "main": "ng-tags-input.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Microquest/ngTagsInput-bower.git#master"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Microquest/ngTagsInput-bower/issues"
+  },
+  "homepage": "https://github.com/Microquest/ngTagsInput-bower#readme"
+}
