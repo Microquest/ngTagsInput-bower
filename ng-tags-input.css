@@ -20,8 +20,6 @@ tags-input .host:active {
 tags-input .tags {
   -moz-appearance: textfield;
   -webkit-appearance: textfield;
-  display: flex;
-  flex-wrap: wrap;
   padding: 1px;
   overflow: hidden;
   word-wrap: break-word;
@@ -29,8 +27,7 @@ tags-input .tags {
   background-color: #fff;
   border: 1px solid darkgray;
   box-shadow: 1px 1px 1px 0 lightgray inset;
-  flex-grow: 4;
-  max-height: inherit;
+  width: 100%;
 }
 tags-input .tags.focused {
   outline: none;
@@ -40,7 +37,6 @@ tags-input .tags.focused {
 }
 tags-input .tags .tag-list {
   display: flex;
-  flex-direction: column;
   flex-wrap: wrap;
   margin: 0;
   padding: 0;
