@@ -74,7 +74,6 @@ tags-input .tags .tag-item .remove-button:active {
 }
 tags-input .input {
   flex-basis: 50%;
-  background-color: pink;
   border: 0;
   outline: none;
   margin: 2px;
