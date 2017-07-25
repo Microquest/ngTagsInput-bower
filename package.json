@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prefix": "postcss ng-tags-input.css --use autoprefixer -r && postcss ng-tags-input.bootstrap.css --use autoprefixer -r",
-    "remove-prefix": "remove-prefixes ng-tags-input.css && ng-tags-input.bootstrap.css"
+    "remove-prefix": "remove-prefixes ./ng-tags-input.css && remove-prefixes ./ng-tags-input.bootstrap.css"
   },
   "repository": {
     "type": "git",
