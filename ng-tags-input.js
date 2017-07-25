@@ -755,10 +755,35 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                     { selected: selected }
                 ];
             };
+            scope.handleFirefox = function() {
+                // DR2DR-3892
+                var delay = 100;
+                setTimeout( function() {
+                    scope.$evalAsync( function() {
+                        suggestionList.reset();
+                    });
+                }, delay);
+            };
+
+            scope.isFirefox = function() {
+                return window.navigator.userAgent.indexOf('Firefox') > -1;
+            };
 
             tagsInput
-                .on('tag-added tag-removed invalid-tag input-blur', function() {
-                    suggestionList.reset();
+                .on('input-blur', function() {
+                    if (scope.isFirefox()){
+                        scope.handleFirefox();
+                    } else {
+                        suggestionList.reset();
+                    }
+                })
+                .on('tag-added tag-removed invalid-tag', function() {
+                    if (scope.isFirefox()){
+                        scope.handleFirefox();
+                    } else {
+                        suggestionList.reset();
+                    }
+
                 })
                 .on('input-change', function(value) {
                     if (shouldLoadSuggestions(value)) {
