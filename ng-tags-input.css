@@ -19,6 +19,7 @@ tags-input *, tags-input *:before, tags-input *:after {
 tags-input .host {
   margin-top: 5px;
   margin-bottom: 5px;
+  position: relative;
 }
 tags-input .host:active {
   outline: none;
@@ -153,6 +154,7 @@ tags-input .autocomplete .suggestion-list {
   max-height: 280px;
   overflow-y: auto;
   position: relative;
+  max-width: inherit;
 }
 tags-input .autocomplete .suggestion-item {
   padding: 5px 10px;
