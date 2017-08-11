@@ -613,30 +613,36 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
             }
             self.visible = true;
         };
-        self.load = tiUtil.debounce(function(query, tags) {
+        // options.debounceDelay
+        self.timeout = null;
+        self.load = function(query, tags) {
+            $timeout.cancel(self.timeout);
             self.query = query;
-
+            var itemPromise = $q.defer();
             var promise = $q.when(loadFn({ $query: query }));
             lastPromise = promise;
 
-            return promise.then(function(items) {
-                if (promise !== lastPromise) {
-                    return;
-                }
+            self.timeout = $timeout(function(){
+                promise.then(function(items) {
+                    if (promise !== lastPromise) {
+                        return;
+                    }
 
-                items = tiUtil.makeObjectArray(items.data || items, getTagId());
-                items = getDifference(items, tags);
-                self.items = items.slice(0, options.maxResultsToShow);
+                    items = tiUtil.makeObjectArray(items.data || items, getTagId());
+                    items = getDifference(items, tags);
+                    self.items = items.slice(0, options.maxResultsToShow);
 
-                if (self.items.length > 0 || options.showNoResults) {
-                    self.show();
-                }
-                else {
-                    self.reset();
-                }
-                return items;
-            });
-        }, options.debounceDelay);
+                    if (self.items.length > 0 || options.showNoResults) {
+                        self.show();
+                    }
+                    else {
+                        self.reset();
+                    }
+                    itemPromise.resolve(items);
+                });
+            }, options.debounceDelay);
+            return itemPromise.promise;
+        };
 
         self.selectNext = function() {
             self.select(++self.index);
@@ -813,14 +819,26 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 // TODO: MAKE AUTOCOMPLETE GROW UPWARDS
                 .on('input-change', function(value) {
                     if (shouldLoadSuggestions(value)) {
-                        suggestionList.load(value, tagsInput.getTags());
+                        var promise = suggestionList.load(value, tagsInput.getTags());
+                        promise.then(
+                            function(items){
+                                if (items && scope.shouldDisplayUpwards(element)) {
+                                    console.log(items.length);
+                                    scope.displayDirection.top = (-1 * ( ( items.length * 28 ) + 15 ) ).toString() + 'px';
+                                    console.log(scope.displayDirection);
+                                } else {
+                                    scope.displayDirection.top = null;
+                                }
+                            }
+                        );
+                        /*
                         if (scope.shouldDisplayUpwards(element)) {
                             console.log(suggestionList.items.length);
                             scope.displayDirection.top = (-1 * ( ( suggestionList.items.length * 28 ) + 15 ) ).toString() + 'px';
                             console.log(scope.displayDirection);
                         } else {
                             scope.displayDirection.top = null;
-                        }
+                        }*/
 
                     }
                     else {
