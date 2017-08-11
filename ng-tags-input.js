@@ -259,6 +259,9 @@ tagsInput.directive('tagsInput', ["$timeout", "$document", "$window", "$q", "tag
                     getTemplateScope: function() {
                         return $scope.templateScope;
                     },
+                    getElement: function() {
+                        return $element;
+                    },
                     on: function(name, handler) {
                         $scope.events.on(name, handler, true);
                         return this;
@@ -616,7 +619,7 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
             var promise = $q.when(loadFn({ $query: query }));
             lastPromise = promise;
 
-            promise.then(function(items) {
+            return promise.then(function(items) {
                 if (promise !== lastPromise) {
                     return;
                 }
@@ -631,6 +634,7 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 else {
                     self.reset();
                 }
+                return items;
             });
         }, options.debounceDelay);
 
@@ -726,6 +730,26 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 return value && value.length >= options.minLength || !value && options.loadOnEmpty;
             };
 
+            function getOffsetTop(elem) {
+                var offsetTop = 0;
+                do {
+                    if( !Number.isNaN(elem.offsetTop)) {
+                        offsetTop += elem.offsetTop;
+                    }
+                } while( elem = elem.offsetParent );
+                console.log(offsetTop);
+                return offsetTop;
+            }
+
+
+            scope.displayDirection = {
+                top: null
+            };
+
+            scope.shouldDisplayUpwards = function(element, items) {
+                return window.innerHeight - getOffsetTop(element[0]) < 300;
+            };
+
             scope.templateScope = tagsInput.getTemplateScope();
 
             scope.addSuggestionByIndex = function(index) {
@@ -785,9 +809,19 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                     }
 
                 })
+
+                // TODO: MAKE AUTOCOMPLETE GROW UPWARDS
                 .on('input-change', function(value) {
                     if (shouldLoadSuggestions(value)) {
                         suggestionList.load(value, tagsInput.getTags());
+                        if (scope.shouldDisplayUpwards(element)) {
+                            console.log(suggestionList.items.length);
+                            scope.displayDirection.top = (-1 * ( ( suggestionList.items.length * 28 ) + 15 ) ).toString() + 'px';
+                            console.log(scope.displayDirection);
+                        } else {
+                            scope.displayDirection.top = null;
+                        }
+
                     }
                     else {
                         suggestionList.reset();
@@ -1092,7 +1126,9 @@ tagsInput.provider('tagsInputConfig', function() {
 tagsInput.factory('tiUtil', ["$timeout", "$q", function($timeout, $q) {
     var self = {};
 
+    // TODO: MAKE AUTOCOMPLETE GROW UPWARDS
     self.debounce = function(fn, delay) {
+        var promise = $q.defer();
         var timeoutId;
         return function() {
             var args = arguments;
@@ -1221,7 +1257,7 @@ tagsInput.run(["$templateCache", function($templateCache) {
   );
 
   $templateCache.put('ngTagsInput/auto-complete.html',
-    "<div class=\"autocomplete\" ng-if=\"suggestionList.visible\">" +
+    "<div class=\"autocomplete\" ng-if=\"suggestionList.visible\" ng-style='displayDirection'>" +
     "<ul class=\"suggestion-list\">" +
     "<li class='no-suggestions' ng-if='suggestionList.items < 1'>No results found. "  +
     "<span ng-bind-html='options.noResultsMessage'></span>"+
