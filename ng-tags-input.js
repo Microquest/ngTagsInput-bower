@@ -259,9 +259,6 @@ tagsInput.directive('tagsInput', ["$timeout", "$document", "$window", "$q", "tag
                     getTemplateScope: function() {
                         return $scope.templateScope;
                     },
-                    getElement: function() {
-                        return $element;
-                    },
                     on: function(name, handler) {
                         $scope.events.on(name, handler, true);
                         return this;
@@ -640,7 +637,7 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                     }
                     itemPromise.resolve(items);
                 });
-            }, options.debounceDelay);
+            }, options.debounceDelay ? options.debounceDelay : 0);
             return itemPromise.promise;
         };
 
@@ -706,7 +703,9 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 selectFirstMatch: [Boolean, true],
                 displayProperty: [String, ''],
                 showNoResults: [Boolean, false],
-                noResultsMessage: [String, ""]
+                noResultsMessage: [String, ""],
+                direction: [String, ""],
+                strategy: [String, ""]
             });
 
             $scope.suggestionList = new SuggestionList($scope.source, $scope.options, $scope.events);
@@ -750,13 +749,41 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
             scope.displayDirection = {
                 top: null
             };
+            // derived from ng-tags-input.css => .suggestion-list#max-height /  options.maxResultsToShow
+            // 280px / default = 10
+            scope.suggestionListItemHeight = 28;
+
+            scope.safeMargin = 20;
 
             scope.shouldDisplayUpwards = function(element, numOfItems) {
-                const itemVerticalOffset = (numOfItems * 28);
-                const totalItemVerticalOffset = getOffsetTop(element[0]) +  itemVerticalOffset;
-                const safeMargin = 20;
-                return ( window.innerHeight - totalItemVerticalOffset ) < safeMargin;
+                if (options.direction === 'up') return true;
+
+                if (options.direction === 'down') return false;
+
+                var elementOffset = getOffsetTop(element[0]);
+
+                if (options.strategy === 'static') {
+                    return scope.staticDisplayStrategy(elementOffset)
+                }
+
+                if (options.strategy === 'dynamic') {
+                    return scope.dynamicDisplayStrategy(elementOffset, numOfItems)
+                }
+
+                return false;
             };
+
+            scope.dynamicDisplayStrategy = function(elementOffset, numOfItems) {
+                var itemVerticalOffset = numOfItems * scope.suggestionListItemHeight;
+                var totalItemVerticalOffset = elementOffset + itemVerticalOffset;
+                return ( window.innerHeight - totalItemVerticalOffset ) < scope.safeMargin ;
+            };
+
+            scope.staticDisplayStrategy = function(elementOffset) {
+                var itemWithSuggestionsOffset = (options.maxResultsToShow * scope.suggestionListItemHeight) + elementOffset;
+                return ( window.innerHeight - itemWithSuggestionsOffset ) < scope.safeMargin;
+            };
+
 
             scope.templateScope = tagsInput.getTemplateScope();
 
@@ -817,12 +844,10 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                     }
 
                 })
-
-                // TODO: MAKE AUTOCOMPLETE GROW UPWARDS
                 .on('input-change', function(value) {
                     if (shouldLoadSuggestions(value)) {
-                        var promise = suggestionList.load(value, tagsInput.getTags());
-                        promise.then(
+                        suggestionList.load(value, tagsInput.getTags()).then(
+                            // DR2DR-3913
                             function(items){
                                 if (items && scope.shouldDisplayUpwards(element, items.length)) {
                                     scope.displayDirection.top = (-1 * ( ( items.length * 28 ) + 15 ) ).toString() + 'px';
@@ -1085,7 +1110,6 @@ tagsInput.provider('tagsInputConfig', function() {
         return {
             load: function(directive, scope, attrs, options) {
                 var defaultValidator = function() { return true; };
-
                 scope.options = {};
 
                 angular.forEach(options, function(value, key) {
