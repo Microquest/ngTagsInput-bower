@@ -743,7 +743,6 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                         offsetTop += elem.offsetTop;
                     }
                 } while( elem = elem.offsetParent );
-                console.log(offsetTop);
                 return offsetTop;
             }
 
@@ -752,8 +751,11 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 top: null
             };
 
-            scope.shouldDisplayUpwards = function(element, items) {
-                return window.innerHeight - getOffsetTop(element[0]) < 300;
+            scope.shouldDisplayUpwards = function(element, numOfItems) {
+                const itemVerticalOffset = (numOfItems * 28);
+                const totalItemVerticalOffset = getOffsetTop(element[0]) +  itemVerticalOffset;
+                const safeMargin = 20;
+                return ( window.innerHeight - totalItemVerticalOffset ) < safeMargin;
             };
 
             scope.templateScope = tagsInput.getTemplateScope();
@@ -822,24 +824,13 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                         var promise = suggestionList.load(value, tagsInput.getTags());
                         promise.then(
                             function(items){
-                                if (items && scope.shouldDisplayUpwards(element)) {
-                                    console.log(items.length);
+                                if (items && scope.shouldDisplayUpwards(element, items.length)) {
                                     scope.displayDirection.top = (-1 * ( ( items.length * 28 ) + 15 ) ).toString() + 'px';
-                                    console.log(scope.displayDirection);
                                 } else {
                                     scope.displayDirection.top = null;
                                 }
                             }
                         );
-                        /*
-                        if (scope.shouldDisplayUpwards(element)) {
-                            console.log(suggestionList.items.length);
-                            scope.displayDirection.top = (-1 * ( ( suggestionList.items.length * 28 ) + 15 ) ).toString() + 'px';
-                            console.log(scope.displayDirection);
-                        } else {
-                            scope.displayDirection.top = null;
-                        }*/
-
                     }
                     else {
                         suggestionList.reset();
