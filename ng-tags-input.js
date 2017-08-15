@@ -852,7 +852,8 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                                 if (items && scope.shouldDisplayUpwards(element, items.length)) {
                                     // best selections appear at the bottom of the upwards facing list
                                     items.reverse();
-                                    scope.displayDirection.top = (-1 * ( ( items.length * 28 ) + 15 ) ).toString() + 'px';
+                                    var length = items.length > options.maxResultsToShow ? options.maxResultsToShow : items.length;
+                                    scope.displayDirection.top = (-1 * ( ( length * 28 ) + 15 ) ).toString() + 'px';
                                 } else {
                                     scope.displayDirection.top = null;
                                 }
