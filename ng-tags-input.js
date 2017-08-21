@@ -610,29 +610,36 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
             }
             self.visible = true;
         };
-        self.load = tiUtil.debounce(function(query, tags) {
+        // options.debounceDelay
+        self.timeout = null;
+        self.load = function(query, tags) {
+            $timeout.cancel(self.timeout);
             self.query = query;
-
+            var itemPromise = $q.defer();
             var promise = $q.when(loadFn({ $query: query }));
             lastPromise = promise;
 
-            promise.then(function(items) {
-                if (promise !== lastPromise) {
-                    return;
-                }
+            self.timeout = $timeout(function(){
+                promise.then(function(items) {
+                    if (promise !== lastPromise) {
+                        return;
+                    }
 
-                items = tiUtil.makeObjectArray(items.data || items, getTagId());
-                items = getDifference(items, tags);
-                self.items = items.slice(0, options.maxResultsToShow);
+                    items = tiUtil.makeObjectArray(items.data || items, getTagId());
+                    items = getDifference(items, tags);
+                    self.items = items.slice(0, options.maxResultsToShow);
 
-                if (self.items.length > 0 || options.showNoResults) {
-                    self.show();
-                }
-                else {
-                    self.reset();
-                }
-            });
-        }, options.debounceDelay);
+                    if (self.items.length > 0 || options.showNoResults) {
+                        self.show();
+                    }
+                    else {
+                        self.reset();
+                    }
+                    itemPromise.resolve(items);
+                });
+            }, options.debounceDelay ? options.debounceDelay : 0);
+            return itemPromise.promise;
+        };
 
         self.selectNext = function() {
             self.select(++self.index);
@@ -696,7 +703,9 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 selectFirstMatch: [Boolean, true],
                 displayProperty: [String, ''],
                 showNoResults: [Boolean, false],
-                noResultsMessage: [String, ""]
+                noResultsMessage: [String, ""],
+                direction: [String, ""],
+                strategy: [String, ""]
             });
 
             $scope.suggestionList = new SuggestionList($scope.source, $scope.options, $scope.events);
@@ -725,6 +734,56 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
             shouldLoadSuggestions = function(value) {
                 return value && value.length >= options.minLength || !value && options.loadOnEmpty;
             };
+
+            function getOffsetTop(elem) {
+                var offsetTop = 0;
+                do {
+                    if( !Number.isNaN(elem.offsetTop)) {
+                        offsetTop += elem.offsetTop;
+                    }
+                } while( elem = elem.offsetParent );
+                return offsetTop;
+            }
+
+
+            scope.displayDirection = {
+                top: null
+            };
+            // derived from ng-tags-input.css => .suggestion-list#max-height /  options.maxResultsToShow
+            // 280px / default = 10
+            scope.suggestionListItemHeight = 28;
+
+            scope.safeMargin = 20;
+
+            scope.shouldDisplayUpwards = function(element, numOfItems) {
+                if (options.direction === 'up') return true;
+
+                if (options.direction === 'down') return false;
+
+                var elementOffset = getOffsetTop(element[0]);
+
+                if (options.strategy === 'static') {
+                    return scope.staticDisplayStrategy(elementOffset)
+                }
+
+                if (options.strategy === 'dynamic') {
+                    return scope.dynamicDisplayStrategy(elementOffset, numOfItems)
+                }
+
+                return false;
+            };
+
+            scope.dynamicDisplayStrategy = function(elementOffset, numOfItems) {
+                var itemVerticalOffset = numOfItems * scope.suggestionListItemHeight;
+                var totalItemVerticalOffset = elementOffset + itemVerticalOffset;
+                return ( window.innerHeight - totalItemVerticalOffset ) < scope.safeMargin ;
+            };
+
+            scope.staticDisplayStrategy = function(elementOffset) {
+                var itemWithSuggestionsOffset = (options.maxResultsToShow * scope.suggestionListItemHeight) + elementOffset;
+                return ( window.innerHeight - itemWithSuggestionsOffset ) < scope.safeMargin;
+            };
+
 
             scope.templateScope = tagsInput.getTemplateScope();
 
@@ -787,7 +846,19 @@ tagsInput.directive('autoComplete', ["$document", "$timeout", "$sce", "$q", "tag
                 })
                 .on('input-change', function(value) {
                     if (shouldLoadSuggestions(value)) {
-                        suggestionList.load(value, tagsInput.getTags());
+                        suggestionList.load(value, tagsInput.getTags()).then(
+                            // DR2DR-3913
+                            function(items){
+                                if (items && scope.shouldDisplayUpwards(element, items.length)) {
+                                    // best selections appear at the bottom of the upwards facing list
+                                    items.reverse();
+                                    var length = items.length > options.maxResultsToShow ? options.maxResultsToShow : items.length;
+                                    scope.displayDirection.top = (-1 * ( ( length * 28 ) + 15 ) ).toString() + 'px';
+                                } else {
+                                    scope.displayDirection.top = null;
+                                }
+                            }
+                        );
                     }
                     else {
                         suggestionList.reset();
@@ -1042,7 +1113,6 @@ tagsInput.provider('tagsInputConfig', function() {
         return {
             load: function(directive, scope, attrs, options) {
                 var defaultValidator = function() { return true; };
-
                 scope.options = {};
 
                 angular.forEach(options, function(value, key) {
@@ -1092,7 +1162,9 @@ tagsInput.provider('tagsInputConfig', function() {
 tagsInput.factory('tiUtil', ["$timeout", "$q", function($timeout, $q) {
     var self = {};
 
+    // TODO: MAKE AUTOCOMPLETE GROW UPWARDS
     self.debounce = function(fn, delay) {
+        var promise = $q.defer();
         var timeoutId;
         return function() {
             var args = arguments;
@@ -1213,7 +1285,7 @@ tagsInput.factory('tiUtil', ["$timeout", "$q", function($timeout, $q) {
 /* HTML templates */
 tagsInput.run(["$templateCache", function($templateCache) {
     $templateCache.put('ngTagsInput/tags-input.html',
-    "<div class=\"host\" tabindex=\"-1\" ng-click=\"eventHandlers.host.click()\" ti-transclude-append><div class=\"tags\" ng-class=\"{focused: hasFocus}\"><ul class=\"tag-list\"><li class=\"tag-item\" ng-repeat=\"tag in tagList.items track by track(tag)\" ng-class=\"getTagClass(tag, $index)\" ng-click=\"eventHandlers.tag.click(tag)\"><ti-tag-item scope=\"templateScope\" data=\"::tag\"></ti-tag-item></li><li><input class=\"input\" autocomplete=\"off\" ng-model=\"newTag.text\" ng-model-options=\"{getterSetter: true}\" ng-keydown=\"eventHandlers.input.keydown($event)\" ng-focus=\"eventHandlers.input.focus($event)\" ng-blur=\"eventHandlers.input.blur($event)\" ng-paste=\"eventHandlers.input.paste($event)\" ng-trim=\"false\" ng-class=\"{'invalid-tag': newTag.invalid}\" ng-disabled=\"disabled\" ti-bind-attrs=\"{type: options.type, placeholder: options.placeholder, tabindex: options.tabindex, spellcheck: options.spellcheck, additionalInfo: options.additionalInfo}\" ti-autosize search-warning warning-duration = 5></li></ul></div></div>"
+    "<div class=\"host\" tabindex=\"-1\" ng-click=\"eventHandlers.host.click()\" ti-transclude-append><div class=\"tags\" ng-class=\"{focused: hasFocus}\"><ul class=\"tag-list\"><li class=\"tag-item\" ng-repeat=\"tag in tagList.items track by track(tag)\" ng-class=\"getTagClass(tag, $index)\" ng-click=\"eventHandlers.tag.click(tag)\"><ti-tag-item scope=\"templateScope\" data=\"::tag\"></ti-tag-item></li><li><input class=\"input\" autocomplete=\"off\" ng-model=\"newTag.text\" ng-model-options=\"{getterSetter: true}\" ng-keydown=\"eventHandlers.input.keydown($event)\" ng-focus=\"eventHandlers.input.focus($event)\" ng-blur=\"eventHandlers.input.blur($event)\" ng-paste=\"eventHandlers.input.paste($event)\" ng-trim=\"false\" ng-class=\"{'invalid-tag': newTag.invalid}\" ng-disabled=\"disabled\" ti-bind-attrs=\"{type: options.type, placeholder: options.placeholder, tabindex: options.tabindex, spellcheck: options.spellcheck, additionalInfo: options.additionalInfo}\" ti-autosize restrict-special-chars warning-duration = 5></li></ul></div></div>"
   );
 
   $templateCache.put('ngTagsInput/tag-item.html',
@@ -1221,7 +1293,7 @@ tagsInput.run(["$templateCache", function($templateCache) {
   );
 
   $templateCache.put('ngTagsInput/auto-complete.html',
-    "<div class=\"autocomplete\" ng-if=\"suggestionList.visible\">" +
+    "<div class=\"autocomplete\" ng-if=\"suggestionList.visible\" ng-style='displayDirection'>" +
     "<ul class=\"suggestion-list\">" +
     "<li class='no-suggestions' ng-if='suggestionList.items < 1'>No results found. "  +
     "<span ng-bind-html='options.noResultsMessage'></span>"+
